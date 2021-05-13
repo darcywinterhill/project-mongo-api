@@ -10,9 +10,18 @@ mongoose.Promise = Promise
 
 const musicTrackSchema = new mongoose.Schema({
   id: Number,
-  trackName: String,
-  artistName: String,
-  genre: String,
+  trackName: {
+    type: String,
+    lowercase: true
+  },
+  artistName: {
+    type: String,
+    lowercase: true
+  },
+  genre: {
+    type: String,
+    lowercase: true
+  },
   bpm: Number,
   energy: Number,
   danceability: Number,
@@ -49,81 +58,140 @@ app.use(express.json())
 //OK
 // Start defining your routes here
 app.get('/', (req, res) => {
-  res.send('Music API')
+  res.send('Popular Music API')
 })
 
 //OK
-//all tracks, all info
+//all tracks, all info + query trackname
 app.get('/tracks', async (req, res) => {
-  const tracks = await MusicTrack.find()
-  res.json({ length: tracks.length, data: tracks })
+  const { trackname } = req.query
+
+  try {
+    if (trackname) {
+      const tracks = await MusicTrack.find({
+        trackName: {
+        $regex: new RegExp(trackname, 'i') 
+        }
+      })
+      res.json({ data: tracks })
+    } else {
+      const tracks = await MusicTrack.find()
+      res.json({ length: tracks.length, data: tracks })
+    } 
+  } catch (error) {
+    res.status(404).json({ error: `Something went wrong`, details: error })
+  }
+
+})
+
+//OK
+//sorts all tracks based on popularity
+app.get('/tracks/popularity', async (req, res) => {
+
+  try {
+    let tracks = await MusicTrack.find() 
+    tracks = tracks.sort((a, b) => b.popularity - a.popularity)
+    res.json({ length: tracks.length, data: tracks })
+  } catch (error) {
+    res.status(404).json({ error: `Something went wrong`, details: error })
+  }
+
 })
 
 //OK
 //one track, by ID
-app.get('/tracks/:id', async (req, res) => {
-  const track = await MusicTrack.findById(req.params.id)
-    res.json({ data: track })
-})
+app.get('/tracks/:trackId', async (req, res) => {
+  const { trackId } = req.params
 
-//NOT OK
-app.get('/tracks/popularity', async (req, res) => {
-  let tracks = await MusicTrack.find() 
-  tracks = tracks.sort((a, b) => b.popularity - a.popularity)
-  res.json({ data: tracks })
+  try {
+    const track = await MusicTrack.findById(trackId)
+    res.json({ data: track })
+  } catch (error) {
+    res.status(400).json({ error: `Something went wrong`, details: error })
+  }
+
 })
 
 //OK
 //all artists - dictionary
 app.get('/artists', async (req, res) => {
-  const tracks = await MusicTrack.find()
-  let artistsDuplicated = tracks
-    .map(item => item.artistName)
-  
-  let artistsUnique = []
-  artistsDuplicated.forEach(item => {
-    if(!artistsUnique.includes(item)) {
-      artistsUnique.push(item)
-    }
-  })
-  res.json({ length: artistsUnique.length, data: artistsUnique })
+
+  try {
+    const tracks = await MusicTrack.find()
+    let artistsDuplicated = tracks
+      .map(item => item.artistName)
+    
+    let artistsUnique = []
+    artistsDuplicated.forEach(item => {
+      if(!artistsUnique.includes(item)) {
+        artistsUnique.push(item)
+      }
+    })
+    res.json({ length: artistsUnique.length, data: artistsUnique })
+  } catch (error) {
+    res.status(400).json({ error: `Something went wrong`, details: error })
+  }
+
 })
 
-//OK BUT needs to fix .toLowerCase and .replace
+//OK
 //get all tracks from one artist
-app.get('/artists/:artist', async (req, res) => {
-  await MusicTrack.find({ artistName: req.params.artist }).then(artist => {
+app.get('/artists/artist/:artist', async (req, res) => {
+  const { artist } = req.params
+
+  try {
     if (artist) {
-      res.json({ length: artist.length, data: artist })
+    const oneArtist = await MusicTrack.find({
+      artistName: {
+        $regex: new RegExp(artist, 'i') 
+      }
+    })
+    res.json({ length: oneArtist.length, data: oneArtist })
     }
-  })
-//.filter(item => item.artistName.toLowerCase().replace(/\s/g, '').includes(artist.toLowerCase().replace(/\s/g, ''))
+  } catch (error) {
+    res.status(404).json({ error: `Something went wrong`, details: error })
+  }
+
 })
 
 //OK
 //all genres - dictionary
 app.get('/genres', async (req, res) => {
-  const tracks = await MusicTrack.find()
-  let genresDuplicated = tracks
-    .map(item => item.genre)
 
-  let genresUnique = []
-  genresDuplicated.forEach(item => {
-    if(!genresUnique.includes(item)) {
-      genresUnique.push(item)
-    }
-  })
-  res.json({ length: genresUnique.length, data: genresUnique })
+  try {
+    const tracks = await MusicTrack.find()
+    let genresDuplicated = tracks
+      .map(item => item.genre)
+
+    let genresUnique = []
+    genresDuplicated.forEach(item => {
+      if(!genresUnique.includes(item)) {
+        genresUnique.push(item)
+      }
+    })
+    res.json({ length: genresUnique.length, data: genresUnique })
+  } catch (error) {
+    res.status(404).json({ error: `Something went wrong`, details: error })
+  }
+
 })
 
-//OK BUT needs to fix .replace
+//OK
 //lists all artists for a specific genre
 app.get('/genres/:genre/artists', async (req, res) => {
-  await MusicTrack.find( { genre: req.params.genre }).then(artist => {
-    if (artist) {
-      res.json({ length: artist.length, data: artist })
-    }
-  })
+  const { genre } = req.params
+
+  try {
+    const artists = await MusicTrack.find({
+      genre: {
+        $regex: new RegExp(genre, 'i')
+      }
+    })
+    res.json({ length: artists.length, data: artists })
+  } catch (error) {
+    res.status(404).json({ error: `Something went wrong`, details: error })
+  }
+
 })
 
 // Start the server
