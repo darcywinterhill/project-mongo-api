@@ -5,7 +5,10 @@ import mongoose from 'mongoose'
 import topMusicData from './data/top-music.json'
 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/project-mongo"
-mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(mongoUrl, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
 mongoose.Promise = Promise
 
 const musicTrackSchema = new mongoose.Schema({
@@ -36,7 +39,7 @@ const musicTrackSchema = new mongoose.Schema({
 
 const MusicTrack = mongoose.model('MusicTrack', musicTrackSchema)
 
-if(process.env.RESET_DB) {
+if (process.env.RESET_DB) {
   const seedDB = async () => {
     await MusicTrack.deleteMany()
 
@@ -54,110 +57,123 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+app.use((req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    next()
+  } else {
+    res.status(503).json({
+      error: `Service unavailable`
+    })
+  }
+})
 
-//OK
-// Start defining your routes here
+//root
 app.get('/', (req, res) => {
   res.send('Popular Music API')
 })
 
-//OK
-//all tracks, all info + query trackname
+//all tracks, all info + query trackname and artist
 app.get('/tracks', async (req, res) => {
-  const { trackname } = req.query
+  const { trackname, artist } = req.query
 
   try {
-    if (trackname) {
-      const tracks = await MusicTrack.find({
+    const tracks = await MusicTrack.aggregate([{
+      $match: {
         trackName: {
-        $regex: new RegExp(trackname, 'i') 
+          $regex: new RegExp(trackname || '', 'i')
+        },
+        artistName: {
+          $regex: new RegExp(artist || '', 'i')
         }
-      })
-      res.json({ data: tracks })
-    } else {
-      const tracks = await MusicTrack.find()
-      res.json({ length: tracks.length, data: tracks })
-    } 
-  } catch (error) {
-    res.status(404).json({ error: `Something went wrong`, details: error })
-  }
+      }
+    }])
 
+    if (tracks.length) {
+      res.json({ length: tracks.length, data: tracks })
+    } else {
+      res.status(404).send({ message: `No match found` })
+    }
+  } catch {
+    res.status(400).json({ error: `Invalid request` })
+  }
 })
 
-//OK
 //sorts all tracks based on popularity
 app.get('/tracks/popularity', async (req, res) => {
 
   try {
-    let tracks = await MusicTrack.find() 
+    let tracks = await MusicTrack.find()
     tracks = tracks.sort((a, b) => b.popularity - a.popularity)
     res.json({ length: tracks.length, data: tracks })
-  } catch (error) {
-    res.status(404).json({ error: `Something went wrong`, details: error })
+  } catch {
+    res.status(400).json({ error: `Invalid request` })
   }
 
 })
 
-//OK
 //one track, by ID
 app.get('/tracks/:trackId', async (req, res) => {
   const { trackId } = req.params
 
   try {
     const track = await MusicTrack.findById(trackId)
-    res.json({ data: track })
+    if (track) {
+      res.json({ data: track })
+    } else {
+      res.status(404).json({ error: `Track not found` })
+    }
   } catch (error) {
-    res.status(400).json({ error: `Something went wrong`, details: error })
+    res.status(400).json({ error: `Invalid request` })
   }
-
+  res.json({ data: track })
 })
 
-//OK
 //all artists - dictionary
 app.get('/artists', async (req, res) => {
-
   try {
     const tracks = await MusicTrack.find()
     let artistsDuplicated = tracks
       .map(item => item.artistName)
-    
+
     let artistsUnique = []
     artistsDuplicated.forEach(item => {
-      if(!artistsUnique.includes(item)) {
+      if (!artistsUnique.includes(item)) {
         artistsUnique.push(item)
       }
     })
     res.json({ length: artistsUnique.length, data: artistsUnique })
-  } catch (error) {
-    res.status(400).json({ error: `Something went wrong`, details: error })
+  } catch {
+    res.status(400).json({ error: `Invalid request` })
   }
-
 })
 
-//OK
+//OK - aggregate working
 //get all tracks from one artist
 app.get('/artists/artist/:artist', async (req, res) => {
   const { artist } = req.params
 
   try {
-    if (artist) {
-    const oneArtist = await MusicTrack.find({
-      artistName: {
-        $regex: new RegExp(artist, 'i') 
+    const artists = await MusicTrack.aggregate([{
+      $match: {
+        artistName: {
+          $regex: new RegExp(artist || '', 'i')
+        }
       }
-    })
-    res.json({ length: oneArtist.length, data: oneArtist })
-    }
-  } catch (error) {
-    res.status(404).json({ error: `Something went wrong`, details: error })
-  }
+    }])
 
+    if (artists.length) {
+      res.json({ length: artists.length, data: artists })
+    } else {
+      res.status(404).send({ message: `No match found` })
+    }
+  } catch {
+    res.status(400).json({ error: `Invalid request` })
+  }
 })
 
 //OK
 //all genres - dictionary
 app.get('/genres', async (req, res) => {
-
   try {
     const tracks = await MusicTrack.find()
     let genresDuplicated = tracks
@@ -165,15 +181,14 @@ app.get('/genres', async (req, res) => {
 
     let genresUnique = []
     genresDuplicated.forEach(item => {
-      if(!genresUnique.includes(item)) {
+      if (!genresUnique.includes(item)) {
         genresUnique.push(item)
       }
     })
     res.json({ length: genresUnique.length, data: genresUnique })
-  } catch (error) {
-    res.status(404).json({ error: `Something went wrong`, details: error })
+  } catch {
+    res.status(400).json({ error: `Invalid request` })
   }
-
 })
 
 //OK
@@ -187,11 +202,15 @@ app.get('/genres/:genre/artists', async (req, res) => {
         $regex: new RegExp(genre, 'i')
       }
     })
-    res.json({ length: artists.length, data: artists })
-  } catch (error) {
-    res.status(404).json({ error: `Something went wrong`, details: error })
-  }
 
+    if (artists.length) {
+      res.json({ length: artists.length, data: artists })
+    } else {
+      res.status(404).send({ message: `No match found` })
+    }
+  } catch {
+    res.status(400).json({ error: `Invalid request` })
+  }
 })
 
 // Start the server
