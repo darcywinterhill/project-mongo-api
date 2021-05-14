@@ -147,7 +147,6 @@ app.get('/artists', async (req, res) => {
   }
 })
 
-//OK - aggregate working
 //get all tracks from one artist
 app.get('/artists/artist/:artist', async (req, res) => {
   const { artist } = req.params
@@ -171,7 +170,6 @@ app.get('/artists/artist/:artist', async (req, res) => {
   }
 })
 
-//OK
 //all genres - dictionary
 app.get('/genres', async (req, res) => {
   try {
@@ -191,7 +189,6 @@ app.get('/genres', async (req, res) => {
   }
 })
 
-//OK
 //lists all artists for a specific genre
 app.get('/genres/:genre/artists', async (req, res) => {
   const { genre } = req.params
