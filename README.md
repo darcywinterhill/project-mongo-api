@@ -1,4 +1,4 @@
-Project built during Technigo Bootcamp
+Project week 18 of Technigo bootcamp
 
 # Mongo API Project
 
