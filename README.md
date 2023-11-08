@@ -4,6 +4,10 @@ Project week 18 of Technigo bootcamp
 
 The project was to use a database to store and retrieve data from and use that data to produce RESTful endpoints.
 
+*** NOTE ***
+Herokuapp is not active - and therefore the projects is not working atm.
+************
+
 ## The problem
 
 In my project I used the top-music.json.
